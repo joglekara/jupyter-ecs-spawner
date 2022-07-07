@@ -7915,6 +7915,12 @@
             "arch": "x86_64",
             "gpu": {"count": 8, "memory": 327680, "type": "A100"},
         },
+        "p4de.24xlarge": {
+            "vcpu": 96,
+            "memory": 1179648,
+            "arch": "x86_64",
+            "gpu": {"count": 8, "memory": 655360, "type": "A100"},
+        },
         "r5n.16xlarge": {"vcpu": 64, "memory": 524288, "arch": "x86_64"},
         "d3.2xlarge": {"vcpu": 8, "memory": 65536, "arch": "x86_64"},
         "c5a.24xlarge": {"vcpu": 96, "memory": 196608, "arch": "x86_64"},
