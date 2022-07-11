@@ -1,35 +1,86 @@
 {
-    "eu-north-1": {"amd": "ami-022ec68e83bf18c6e", "arm64": "ami-0e620af3b69c9180b", "gpu": "ami-0d098d9dcbcad642c"},
-    "ap-south-1": {"amd": "ami-04b412847162495a3", "arm64": "ami-0d1716fb8e78a3639", "gpu": "ami-02d600a774f09f569"},
-    "eu-west-3": {"amd": "ami-0f51be0cf2e87b06c", "arm64": "ami-06c3fe729a5f8d46d", "gpu": "ami-08fde2d70809a1cb6"},
-    "eu-west-2": {"amd": "ami-070d0f1b66ccfd0fa", "arm64": "ami-040b9899d7c760b6d", "gpu": "ami-045e2c016fe4dc18b"},
-    "eu-west-1": {"amd": "ami-044fb3b709f19cb4a", "arm64": "ami-009f06b04135aa24e", "gpu": "ami-0d8f1ba19bed19678"},
-    "ap-northeast-3": {"amd": "ami-0eed98dfb76a6eb00", "gpu": "ami-0233b4812ef888b7f"},
+    "eu-north-1": {
+        "amd": "ami-022ec68e83bf18c6e",
+        "arm64": "ami-0e620af3b69c9180b",
+        "gpu": "ami-0d098d9dcbcad642c"
+    },
+    "ap-south-1": {
+        "amd": "ami-04b412847162495a3",
+        "arm64": "ami-0d1716fb8e78a3639",
+        "gpu": "ami-02d600a774f09f569"
+    },
+    "eu-west-3": {
+        "amd": "ami-0f51be0cf2e87b06c",
+        "arm64": "ami-06c3fe729a5f8d46d",
+        "gpu": "ami-08fde2d70809a1cb6"
+    },
+    "eu-west-2": {
+        "amd": "ami-070d0f1b66ccfd0fa",
+        "arm64": "ami-040b9899d7c760b6d",
+        "gpu": "ami-045e2c016fe4dc18b"
+    },
+    "eu-west-1": {
+        "amd": "ami-044fb3b709f19cb4a",
+        "arm64": "ami-009f06b04135aa24e",
+        "gpu": "ami-0d8f1ba19bed19678"
+    },
+    "ap-northeast-3": {
+        "amd": "ami-0eed98dfb76a6eb00",
+        "gpu": "ami-0233b4812ef888b7f"
+    },
     "ap-northeast-2": {
         "amd": "ami-0fd206971b03d9eb0",
         "arm64": "ami-0492ad24afebd83ed",
-        "gpu": "ami-022475e6cee6f919f",
+        "gpu": "ami-022475e6cee6f919f"
     },
     "ap-northeast-1": {
         "amd": "ami-08dd79a478ef2a81c",
         "arm64": "ami-00ec47715ffdb5518",
-        "gpu": "ami-0eab5973a4ee406ab",
+        "gpu": "ami-0eab5973a4ee406ab"
     },
-    "sa-east-1": {"amd": "ami-06205847307e9f474", "arm64": "ami-028edb9e4b1177a8a", "gpu": "ami-0de5d8a6ee46f75ad"},
-    "ca-central-1": {"amd": "ami-03e6eb48311b78d14", "arm64": "ami-0194d2d511d90e3a7", "gpu": "ami-02122f69bd7d105bc"},
+    "sa-east-1": {
+        "amd": "ami-06205847307e9f474",
+        "arm64": "ami-028edb9e4b1177a8a",
+        "gpu": "ami-0de5d8a6ee46f75ad"
+    },
+    "ca-central-1": {
+        "amd": "ami-03e6eb48311b78d14",
+        "arm64": "ami-0194d2d511d90e3a7",
+        "gpu": "ami-02122f69bd7d105bc"
+    },
     "ap-southeast-1": {
         "amd": "ami-08222ba0572c64812",
         "arm64": "ami-0a607811847c75505",
-        "gpu": "ami-0e8c2bf357b09d913",
+        "gpu": "ami-0e8c2bf357b09d913"
     },
     "ap-southeast-2": {
         "amd": "ami-0a5d07e2b337abadb",
         "arm64": "ami-023588a20be64fd16",
-        "gpu": "ami-0b863a2c146e74c57",
+        "gpu": "ami-0b863a2c146e74c57"
     },
-    "eu-central-1": {"amd": "ami-006aeb802a1a7862a", "arm64": "ami-06b597aca62ca5136", "gpu": "ami-0a152181216f08895"},
-    "us-east-1": {"amd": "ami-040d909ea4e56f8f3", "arm64": "ami-0656f8e7f3f221345", "gpu": "ami-0fa6daadb54fd8296"},
-    "us-east-2": {"amd": "ami-09ce6553a7f2ae75d", "arm64": "ami-0ea01e64891fb03be", "gpu": "ami-0870e003962109e7c"},
-    "us-west-1": {"amd": "ami-091c5e73d3a79e85e", "arm64": "ami-09d5396bd86056e15", "gpu": "ami-0d8a291145215bd94"},
-    "us-west-2": {"amd": "ami-02c6f7952af6bd632", "arm64": "ami-04d9919ed513c879f", "gpu": "ami-0b6869420bf65074d"},
+    "eu-central-1": {
+        "amd": "ami-006aeb802a1a7862a",
+        "arm64": "ami-06b597aca62ca5136",
+        "gpu": "ami-0a152181216f08895"
+    },
+    "us-east-1": {
+        "amd": "ami-040d909ea4e56f8f3",
+        "arm64": "ami-0656f8e7f3f221345",
+        "gpu": "ami-0fa6daadb54fd8296"
+    },
+    "us-east-2": {
+        "amd": "ami-09ce6553a7f2ae75d",
+        "arm64": "ami-0ea01e64891fb03be",
+        "gpu": "ami-0870e003962109e7c"
+    },
+    "us-west-1": {
+        "amd": "ami-091c5e73d3a79e85e",
+        "arm64": "ami-09d5396bd86056e15",
+        "gpu": "ami-0d8a291145215bd94"
+    },
+    "us-west-2": {
+        "amd": "ami-02c6f7952af6bd632",
+        "arm64": "ami-04d9919ed513c879f",
+        "gpu": "ami-0b6869420bf65074d"
+    }
 }
