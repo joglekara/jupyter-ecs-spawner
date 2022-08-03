@@ -121,7 +121,7 @@ class ECSSpawner(Spawner):
                 if tag["Value"] == "private":
                     priv = True
                 if tag["Key"] == "user":
-                    if len(tag["SubnetIds"]) == 0:
+                    if len(fs["SubnetIds"]) == 0:
                         self.log.warning(
                             f'Found filesystem matching f{tag["Value"]} with no subnets, skipping {fs["FileSystemId"]}'
                         )
