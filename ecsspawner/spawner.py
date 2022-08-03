@@ -544,13 +544,17 @@ class ECSSpawner(Spawner):
             taskDefinition=self.task_definition_arn,
         )
         waiter = ecs_client.get_waiter("tasks_running")
+        logger.info(f'Tasks are {r["tasks"][0]["taskArn"]}')
+        logger.info(f"Tasks are {r}")
         try:
             waiter.wait(cluster=self.ecs_cluster, tasks=[r["tasks"][0]["taskArn"]])
         except Exception as e:
             self.log.error(
                 "Exception while waiting for container to be up : {0}".format(e)
             )
-            logger("Exception while waiting for container to be up : {0}".format(e))
+            logger.info(
+                "Exception while waiting for container to be up : {0}".format(e)
+            )
             return None
         self.log.info("ECS task is running")
         return self.task_definition_arn
