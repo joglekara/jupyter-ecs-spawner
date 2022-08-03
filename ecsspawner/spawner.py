@@ -109,7 +109,7 @@ class ECSSpawner(Spawner):
         }
 
     @staticmethod
-    def get_private_ids():
+    def get_private_ids(self):
         efs_client = boto3.client("efs")
         r = efs_client.describe_file_systems()
 
