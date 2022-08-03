@@ -119,6 +119,7 @@ class ECSSpawner(Spawner):
                 self.log.warning(
                     f'Found filesystem matching with no mount targets, skipping {fs["FileSystemId"]}'
                 )
+                continue
             priv = False
             name = False
             for tag in fs["Tags"]:
@@ -507,26 +508,33 @@ class ECSSpawner(Spawner):
         self.log.info("Creating ECS task def")
         self.state.append("Creating ECS task def")
 
-        r = ecs_client.register_task_definition(
-            family="jupyter-task-{0}".format(self.user.name),
-            taskRoleArn=self.task_role_arn,
-            networkMode="host",
-            volumes=[
-                {
-                    "name": "shared-persistent-volume",
-                    "efsVolumeConfiguration": {
-                        "fileSystemId": self.efs_id,
-                        "transitEncryption": "DISABLED",
-                    },
+        # Add the shared EFS drive, and
+        # then also add the private EFS drive if the user has one
+        volumes = [
+            {
+                "name": "shared-persistent-volume",
+                "efsVolumeConfiguration": {
+                    "fileSystemId": self.efs_id,
+                    "transitEncryption": "DISABLED",
                 },
+            }
+        ]
+        if sef.user.name in self.efs_private_id.keys():
+            volumes.append(
                 {
                     "name": "private-persistent-volume",
                     "efsVolumeConfiguration": {
                         "fileSystemId": self.efs_private_id[self.user.name],
                         "transitEncryption": "DISABLED",
                     },
-                },
-            ],
+                }
+            )
+
+        r = ecs_client.register_task_definition(
+            family="jupyter-task-{0}".format(self.user.name),
+            taskRoleArn=self.task_role_arn,
+            networkMode="host",
+            volumes=volumes,
             containerDefinitions=[container_def],
         )
         self.log.info(f"ECS task created")
