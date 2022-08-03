@@ -517,7 +517,7 @@ class ECSSpawner(Spawner):
                 },
             }
         ]
-        efs_private_id = self.get_private_ids()
+        efs_private_id = self.get_private_efs_ids()
         if self.user.name in efs_private_id.keys():
             volumes.append(
                 {
