@@ -115,23 +115,19 @@ class ECSSpawner(Spawner):
         all_ids = {}
 
         for fs in r["FileSystems"]:
+            if fs["NumberOfMountTargets"] == 0:
+                self.log.warning(
+                    f'Found filesystem matching with no mount targets, skipping {fs["FileSystemId"]}'
+                )
             priv = False
+            name = False
             for tag in fs["Tags"]:
                 if tag["Value"] == "private":
                     priv = True
                 if tag["Key"] == "user":
-                    if fs["NumberOfMountTargets"] == 0:
-                        self.log.warning(
-                            f'Found filesystem matching f{tag["Value"]} with no mount targets, skipping {fs["FileSystemId"]}'
-                        )
-                        logger.warning(
-                            f'Found filesystem matching f{tag["Value"]} with no mount targets, skipping {fs["FileSystemId"]}'
-                        )
-                    else:
-                        name = tag["Value"]
-            if priv:
+                    name = tag["Value"]
+            if priv and name:
                 all_ids[name] = fs["FileSystemId"]
-
         return all_ids
 
     def check_config(self):
