@@ -544,8 +544,8 @@ class ECSSpawner(Spawner):
             taskDefinition=self.task_definition_arn,
         )
         waiter = ecs_client.get_waiter("tasks_running")
-        logger.info(f'Tasks are {r["tasks"][0]["taskArn"]}')
-        logger.info(f"Tasks are {r}")
+        self.log.info(f'Tasks are {r["tasks"][0]["taskArn"]}')
+        self.log.info(f"Tasks are {r}")
         try:
             waiter.wait(cluster=self.ecs_cluster, tasks=[r["tasks"][0]["taskArn"]])
         except Exception as e:
