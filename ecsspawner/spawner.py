@@ -108,7 +108,6 @@ class ECSSpawner(Spawner):
             # "JUPYTERHUB_ACTIVITY_URL": f"http://{self.hub_host}:8081/hub/api/users/test/activity",
         }
 
-    @staticmethod
     def get_private_ids(self):
         efs_client = boto3.client("efs")
         r = efs_client.describe_file_systems()
