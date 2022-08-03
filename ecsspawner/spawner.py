@@ -89,8 +89,6 @@ class ECSSpawner(Spawner):
         self.hub_host = os.environ["HUB_HOSTNAME"]
         self.task_role_arn = os.environ["TASK_ROLE_ARN"]
         self.efs_id = os.environ["EFS_ID"]
-        self.efs_private_id = self.get_private_ids()
-        logger.info(f"Got EFS id for {self.efs_private_id}")
         self.subnet_id = os.environ["SUBNET_ID"]
         self.sg_id = [os.environ["SECURITY_GROUP_ID"]]
         self.ecs_cluster = os.environ["ECS_CLUSTER"]
@@ -108,7 +106,7 @@ class ECSSpawner(Spawner):
             # "JUPYTERHUB_ACTIVITY_URL": f"http://{self.hub_host}:8081/hub/api/users/test/activity",
         }
 
-    def get_private_ids(self):
+    def get_private_efs_ids(self):
         efs_client = boto3.client("efs")
         r = efs_client.describe_file_systems()
 
@@ -519,7 +517,8 @@ class ECSSpawner(Spawner):
                 },
             }
         ]
-        if sef.user.name in self.efs_private_id.keys():
+        efs_private_id = self.get_private_ids()
+        if self.user.name in efs_private_id.keys():
             volumes.append(
                 {
                     "name": "private-persistent-volume",
