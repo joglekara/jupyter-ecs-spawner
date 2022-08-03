@@ -121,12 +121,12 @@ class ECSSpawner(Spawner):
                 if tag["Value"] == "private":
                     priv = True
                 if tag["Key"] == "user":
-                    if len(fs["SubnetIds"]) == 0:
+                    if fs["NumberOfMountTargets"] == 0:
                         self.log.warning(
-                            f'Found filesystem matching f{tag["Value"]} with no subnets, skipping {fs["FileSystemId"]}'
+                            f'Found filesystem matching f{tag["Value"]} with no mount targets, skipping {fs["FileSystemId"]}'
                         )
                         logger.warning(
-                            f'Found filesystem matching f{tag["Value"]} with no subnets, skipping {fs["FileSystemId"]}'
+                            f'Found filesystem matching f{tag["Value"]} with no mount targets, skipping {fs["FileSystemId"]}'
                         )
                     else:
                         name = tag["Value"]
