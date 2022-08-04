@@ -523,7 +523,7 @@ class ECSSpawner(Spawner):
                 {
                     "name": "private-persistent-volume",
                     "efsVolumeConfiguration": {
-                        "fileSystemId": self.efs_private_id[self.user.name],
+                        "fileSystemId": efs_private_id[self.user.name],
                         "transitEncryption": "DISABLED",
                     },
                 }
