@@ -518,12 +518,15 @@ class ECSSpawner(Spawner):
             }
         ]
         efs_private_id = self.get_private_efs_ids()
-        if self.user.name in efs_private_id.keys():
+
+        #Use only user names before a '-' for EFS drive name
+        user_root_string = self.user.name.split('-')[0]
+        if user_root_string in efs_private_id.keys():
             volumes.append(
                 {
                     "name": "private-persistent-volume",
                     "efsVolumeConfiguration": {
-                        "fileSystemId": efs_private_id[self.user.name],
+                        "fileSystemId": efs_private_id[user_root_string],
                         "transitEncryption": "DISABLED",
                     },
                 }
