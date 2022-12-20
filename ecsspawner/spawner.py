@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 import base64
 import pkgutil
@@ -19,15 +20,26 @@ from jupyterhub.spawner import Spawner
 
 from concurrent.futures import ThreadPoolExecutor
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+logger = logging.getLogger("ECS")
+
 
 class ECSSpawner(Spawner):
 
     custom_tags = traitlets.Dict(
         value_trait=traitlets.Unicode(), key_trait=traitlets.Unicode(), config=True
     )  # Dict of tags to apply to all instance
-    ec2_ami = traitlets.Unicode(config=True)  # Id of the AMI to use for instance without GPU
-    ec2_arm_ami = traitlets.Unicode(config=True)  # Id of the AMI to use for ARM instance without GPU
-    ec2_gpu_ami = traitlets.Unicode(config=True)  # Id of the AMI to use for instance with GPU
+    ec2_ami = traitlets.Unicode(
+        config=True
+    )  # Id of the AMI to use for instance without GPU
+    ec2_arm_ami = traitlets.Unicode(
+        config=True
+    )  # Id of the AMI to use for ARM instance without GPU
+    ec2_gpu_ami = traitlets.Unicode(
+        config=True
+    )  # Id of the AMI to use for instance with GPU
     instance_role_arn = traitlets.Unicode(
         config=True
     )  # ARN of the role to associate with the EC2 instances. Must grant access to ECS.
@@ -77,7 +89,6 @@ class ECSSpawner(Spawner):
         self.hub_host = os.environ["HUB_HOSTNAME"]
         self.task_role_arn = os.environ["TASK_ROLE_ARN"]
         self.efs_id = os.environ["EFS_ID"]
-        self.efs_private_id = self.get_private_ids()
         self.subnet_id = os.environ["SUBNET_ID"]
         self.sg_id = [os.environ["SECURITY_GROUP_ID"]]
         self.ecs_cluster = os.environ["ECS_CLUSTER"]
@@ -95,24 +106,27 @@ class ECSSpawner(Spawner):
             # "JUPYTERHUB_ACTIVITY_URL": f"http://{self.hub_host}:8081/hub/api/users/test/activity",
         }
 
-    @staticmethod
-    def get_private_ids():
+    def get_private_efs_ids(self):
         efs_client = boto3.client("efs")
         r = efs_client.describe_file_systems()
 
         all_ids = {}
 
         for fs in r["FileSystems"]:
+            if fs["NumberOfMountTargets"] == 0:
+                self.log.warning(
+                    f'Found filesystem matching with no mount targets, skipping {fs["FileSystemId"]}'
+                )
+                continue
             priv = False
+            name = False
             for tag in fs["Tags"]:
                 if tag["Value"] == "private":
                     priv = True
                 if tag["Key"] == "user":
                     name = tag["Value"]
-
-            if priv:
+            if priv and name:
                 all_ids[name] = fs["FileSystemId"]
-
         return all_ids
 
     def check_config(self):
@@ -154,7 +168,7 @@ class ECSSpawner(Spawner):
             self.instance_id = None
             self.task_definition_arn = None
         else:
-            self.log.debug("Stop called when no instance was created")
+            self.log.info("Stop called when no instance was created")
 
     async def progress(self):
         i = 0
@@ -191,7 +205,9 @@ class ECSSpawner(Spawner):
             "MinCount": 1,
             "MaxCount": 1,
             "InstanceType": tpe,
-            "UserData": base64.b64encode(self.USER_DATA_SCRIPT.format(self.ecs_cluster).encode()).decode(),
+            "UserData": base64.b64encode(
+                self.USER_DATA_SCRIPT.format(self.ecs_cluster).encode()
+            ).decode(),
             "InstanceInitiatedShutdownBehavior": "terminate",
             "IamInstanceProfile": {"Arn": self.instance_role_arn},
             "TagSpecifications": [
@@ -218,22 +234,27 @@ class ECSSpawner(Spawner):
         run_args["BlockDeviceMappings"] = [
             {
                 "DeviceName": self.__get_root_volume_name(ami),
-                "Ebs": {"VolumeSize": self.volume_size, "VolumeType": "gp3", "DeleteOnTermination": True},
+                "Ebs": {
+                    "VolumeSize": self.volume_size,
+                    "VolumeType": "gp3",
+                    "DeleteOnTermination": True,
+                },
             }
         ]
         instance = ec2_client.run_instances(**run_args)
-        self.log.info("Starting EC2 instance")
         instance_id = instance["Instances"][0]["InstanceId"]
+        self.log.info(f"Starting EC2 instance: {instance_id}")
+        logger.info(f"Starting EC2 instance: {instance_id}")
         waiter = ec2_client.get_waiter("instance_running")
         waiter.wait(InstanceIds=[instance_id])
         if self.use_public_ip is True:
-            self.ip = ec2_client.describe_instances(InstanceIds=[instance_id])["Reservations"][0]["Instances"][0][
-                "PublicIpAddress"
-            ]
+            self.ip = ec2_client.describe_instances(InstanceIds=[instance_id])[
+                "Reservations"
+            ][0]["Instances"][0]["PublicIpAddress"]
         else:
-            self.ip = ec2_client.describe_instances(InstanceIds=[instance_id])["Reservations"][0]["Instances"][0][
-                "PrivateIpAddress"
-            ]
+            self.ip = ec2_client.describe_instances(InstanceIds=[instance_id])[
+                "Reservations"
+            ][0]["Instances"][0]["PrivateIpAddress"]
         self.state.append("Instance running")
         self.log.info("EC2 instance is running (id: {0})".format(instance_id))
         return instance_id
@@ -249,7 +270,9 @@ class ECSSpawner(Spawner):
         run_args = {
             "ImageId": ami,
             "InstanceType": tpe,
-            "UserData": base64.b64encode(self.USER_DATA_SCRIPT.format(self.ecs_cluster).encode()).decode(),
+            "UserData": base64.b64encode(
+                self.USER_DATA_SCRIPT.format(self.ecs_cluster).encode()
+            ).decode(),
             "IamInstanceProfile": {"Arn": self.instance_role_arn},
         }
         if self.key_pair_name:
@@ -262,31 +285,45 @@ class ECSSpawner(Spawner):
         run_args["BlockDeviceMappings"] = [
             {
                 "DeviceName": self.__get_root_volume_name(ami),
-                "Ebs": {"VolumeSize": self.volume_size, "VolumeType": "gp3", "DeleteOnTermination": True},
+                "Ebs": {
+                    "VolumeSize": self.volume_size,
+                    "VolumeType": "gp3",
+                    "DeleteOnTermination": True,
+                },
             }
         ]
-        spot_request = ec2_client.request_spot_instances(InstanceCount=1, LaunchSpecification=run_args)
+        spot_request = ec2_client.request_spot_instances(
+            InstanceCount=1, LaunchSpecification=run_args
+        )
         self.state.append("Spot request created")
         waiter = ec2_client.get_waiter("spot_instance_request_fulfilled")
-        waiter.wait(SpotInstanceRequestIds=[spot_request["SpotInstanceRequests"][0]["SpotInstanceRequestId"]])
+        waiter.wait(
+            SpotInstanceRequestIds=[
+                spot_request["SpotInstanceRequests"][0]["SpotInstanceRequestId"]
+            ]
+        )
         self.state.append("Spot instance running")
         spot_instance = ec2_client.describe_spot_instance_requests(
-            SpotInstanceRequestIds=[spot_request["SpotInstanceRequests"][0]["SpotInstanceRequestId"]]
+            SpotInstanceRequestIds=[
+                spot_request["SpotInstanceRequests"][0]["SpotInstanceRequestId"]
+            ]
         )
         instance_id = spot_instance["SpotInstanceRequests"][0]["InstanceId"]
         self.log.info("Spot instance is running (id: {0})".format(instance_id))
         ec2_client.create_tags(
             Resources=[instance_id],
-            Tags=[{"Key": "Name", "Value": "jupyter-notebook-{0}".format(self.user.name)}],
+            Tags=[
+                {"Key": "Name", "Value": "jupyter-notebook-{0}".format(self.user.name)}
+            ],
         )
         if self.use_public_ip is True:
-            self.ip = ec2_client.describe_instances(InstanceIds=[instance_id])["Reservations"][0]["Instances"][0][
-                "PublicIpAddress"
-            ]
+            self.ip = ec2_client.describe_instances(InstanceIds=[instance_id])[
+                "Reservations"
+            ][0]["Instances"][0]["PublicIpAddress"]
         else:
-            self.ip = ec2_client.describe_instances(InstanceIds=[instance_id])["Reservations"][0]["Instances"][0][
-                "PrivateIpAddress"
-            ]
+            self.ip = ec2_client.describe_instances(InstanceIds=[instance_id])[
+                "Reservations"
+            ][0]["Instances"][0]["PrivateIpAddress"]
         return instance_id
 
     async def __spawn_ec2(self, tpe):
@@ -296,7 +333,10 @@ class ECSSpawner(Spawner):
                 ami = self.ec2_gpu_ami
             else:
                 ami = self.amis[region]["gpu"]
-        elif self.instances[region][tpe]["arch"] == "x86_64" or self.instances[region][tpe]["arch"] == "i386":
+        elif (
+            self.instances[region][tpe]["arch"] == "x86_64"
+            or self.instances[region][tpe]["arch"] == "i386"
+        ):
             if self.ec2_ami != "":
                 ami = self.ec2_ami
             else:
@@ -315,7 +355,9 @@ class ECSSpawner(Spawner):
             self.state.append("Requesting {0} spot instance".format(tpe))
             spawn_method = self.__request_spot_instance
         with ThreadPoolExecutor(1) as executor:
-            future = asyncio.wrap_future(executor.submit(spawn_method, ami, tpe, region))
+            future = asyncio.wrap_future(
+                executor.submit(spawn_method, ami, tpe, region)
+            )
             await asyncio.wrap_future(future)
             self.instance_id = future.result()
         self.log.info("Finished spawning EC2")
@@ -328,12 +370,14 @@ class ECSSpawner(Spawner):
         available_cpu = 0
         bound_port = 8083
         self.state.append("Waiting for any instances to appear in ECS cluster")
-        container_instances_arn = ecs_client.list_container_instances(cluster=self.ecs_cluster)["containerInstanceArns"]
+        container_instances_arn = ecs_client.list_container_instances(
+            cluster=self.ecs_cluster
+        )["containerInstanceArns"]
         while not len(container_instances_arn):
             time.sleep(5)
-            container_instances_arn = ecs_client.list_container_instances(cluster=self.ecs_cluster)[
-                "containerInstanceArns"
-            ]
+            container_instances_arn = ecs_client.list_container_instances(
+                cluster=self.ecs_cluster
+            )["containerInstanceArns"]
 
         found = False
         attempt = 0
@@ -343,12 +387,14 @@ class ECSSpawner(Spawner):
         while (attempt < max_tries) and (not found):
             container_instances = ecs_client.describe_container_instances(
                 cluster=self.ecs_cluster,
-                containerInstances=ecs_client.list_container_instances(cluster=self.ecs_cluster)[
-                    "containerInstanceArns"
-                ],
+                containerInstances=ecs_client.list_container_instances(
+                    cluster=self.ecs_cluster
+                )["containerInstanceArns"],
             )["containerInstances"]
             for this_instance in container_instances:
-                self.state.append(f"attempt {attempt} - {this_instance['ec2InstanceId']} - {self.instance_id}")
+                self.state.append(
+                    f"attempt {attempt} - {this_instance['ec2InstanceId']} - {self.instance_id}"
+                )
                 if this_instance["ec2InstanceId"] == self.instance_id:
                     found = True
                     self.container_instance_arn = this_instance["containerInstanceArn"]
@@ -366,19 +412,30 @@ class ECSSpawner(Spawner):
                 )
 
         if not found:
-            self.log.warn("Did not find container instance for {0}".format(self.instance_id))
+            self.log.warn(
+                "Did not find container instance for {0}".format(self.instance_id)
+            )
             return None
         else:
             self.log.info("Found container instance for {0}".format(self.instance_id))
         ecs_client.put_attributes(
             cluster=self.ecs_cluster,
-            attributes=[{"name": "jupyter-owner", "value": self.user.name, "targetId": self.container_instance_arn}],
+            attributes=[
+                {
+                    "name": "jupyter-owner",
+                    "value": self.user.name,
+                    "targetId": self.container_instance_arn,
+                }
+            ],
         )
 
         if self.user_options["image"] != "":
             container_image = self.user_options["image"]
         else:
-            if self.instances[region][self.user_options["instance"]].get("gpu") is not None:
+            if (
+                self.instances[region][self.user_options["instance"]].get("gpu")
+                is not None
+            ):
                 container_image = self.default_docker_image_gpu
             else:
                 container_image = self.default_docker_image
@@ -392,13 +449,15 @@ class ECSSpawner(Spawner):
             container_env[k] = v
 
         self.log.info("Using docker image {0}".format(container_image))
-
+        logger.info("Using docker image {0}".format(container_image))
         container_def = {
             "name": "jupyter-task-{0}".format(self.user.name),
             "image": container_image,
             "cpu": available_cpu,
             "memory": available_memory,
-            "environment": [{"name": key, "value": value} for key, value in container_env.items()],
+            "environment": [
+                {"name": key, "value": value} for key, value in container_env.items()
+            ],
             "user": "root",
             "workingDirectory": "/home/{0}".format(self.user.name),
             "command": ["start-singleuser.sh"],
@@ -407,7 +466,9 @@ class ECSSpawner(Spawner):
                 "options": {
                     "awslogs-region": region,
                     "awslogs-create-group": "true",
-                    "awslogs-group": "/jupyterhub/jupyter-logs-{0}".format(self.user.name),
+                    "awslogs-group": "/jupyterhub/jupyter-logs-{0}".format(
+                        self.user.name
+                    ),
                 },
             },
             "mountPoints": [
@@ -424,52 +485,63 @@ class ECSSpawner(Spawner):
             ],
             "linuxParameters": {"sharedMemorySize": int(self.volume_size / 4) * 1000},
         }
-
+        logger.info(f"Container definition: {container_def}")
         if self.port_binding:
             print(f"binding port = {self.port_binding}")
-            container_def["portMappings"] = ({"containerPort": self.port_binding, "hostPort": self.port_binding},)
+            container_def["portMappings"] = (
+                {"containerPort": self.port_binding, "hostPort": self.port_binding},
+            )
             self.log.info(f"Binding port = {self.port_binding}")
 
         if self.instances[region][self.user_options["instance"]].get("gpu") is not None:
-            num_gpus = self.instances[region][self.user_options["instance"]]["gpu"]["count"]
+            num_gpus = self.instances[region][self.user_options["instance"]]["gpu"][
+                "count"
+            ]
             print(f"gpus = {num_gpus}")
-            container_def["resourceRequirements"] = [{"type": "GPU", "value": str(num_gpus)}]
+            container_def["resourceRequirements"] = [
+                {"type": "GPU", "value": str(num_gpus)}
+            ]
             self.log.info(f"Using {num_gpus} x GPU")
 
         self.log.info("Creating ECS task def")
         self.state.append("Creating ECS task def")
+
+        # Add the shared EFS drive, and
+        # then also add the private EFS drive if the user has one
         volumes = [
             {
                 "name": "shared-persistent-volume",
-                "efsVolumeConfiguration": {"fileSystemId": self.efs_id, "transitEncryption": "DISABLED"},
-            },
-            {
-                "name": "private-persistent-volume",
                 "efsVolumeConfiguration": {
-                    "fileSystemId": self.efs_private_id[self.user.name],
+                    "fileSystemId": self.efs_id,
                     "transitEncryption": "DISABLED",
                 },
-            },
+            }
         ]
-        task_def = dict(
+        efs_private_id = self.get_private_efs_ids()
+
+        #Use only user names before a '-' for EFS drive name
+        user_root_string = self.user.name.split('-')[0]
+        if user_root_string in efs_private_id.keys():
+            volumes.append(
+                {
+                    "name": "private-persistent-volume",
+                    "efsVolumeConfiguration": {
+                        "fileSystemId": efs_private_id[user_root_string],
+                        "transitEncryption": "DISABLED",
+                    },
+                }
+            )
+
+        r = ecs_client.register_task_definition(
             family="jupyter-task-{0}".format(self.user.name),
             taskRoleArn=self.task_role_arn,
             networkMode="host",
             volumes=volumes,
             containerDefinitions=[container_def],
         )
-        self.log.info("Volumes - ")
-        self.log.info(volumes)
-
-        self.log.info("Task Def - ")
-        self.log.info(task_def)
-        self.state.append(f"The EFS ID that was found for {self.user.name} is {self.efs_private_id[self.user.name]}")
-        self.log.info(f"The EFS ID that was found for {self.user.name} is {self.efs_private_id[self.user.name]}")
-        r = ecs_client.register_task_definition(task_def)
-
-        self.log.info("ECS task created")
+        self.log.info(f"ECS task created")
         self.task_definition_arn = r["taskDefinition"]["taskDefinitionArn"]
-        self.log.info("Starting ECS task")
+        self.log.info(f"Starting ECS task {self.task_definition_arn}")
         self.state.append("Starting ECS task")
         r = ecs_client.start_task(
             cluster=self.ecs_cluster,
@@ -477,10 +549,17 @@ class ECSSpawner(Spawner):
             taskDefinition=self.task_definition_arn,
         )
         waiter = ecs_client.get_waiter("tasks_running")
+        self.log.info(f'Tasks are {r["tasks"][0]["taskArn"]}')
+        self.log.info(f"Tasks are {r}")
         try:
             waiter.wait(cluster=self.ecs_cluster, tasks=[r["tasks"][0]["taskArn"]])
         except Exception as e:
-            self.log.error("Exception while waiting for container to be up : {0}".format(e))
+            self.log.error(
+                "Exception while waiting for container to be up : {0}".format(e)
+            )
+            logger.info(
+                "Exception while waiting for container to be up : {0}".format(e)
+            )
             return None
         self.log.info("ECS task is running")
         return self.task_definition_arn
