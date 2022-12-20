@@ -84,7 +84,7 @@ class ECSSpawner(Spawner):
         self.instance_role_arn = os.environ["INSTANCE_ROLE_ARN"]
         self.default_volume_size = os.environ["VOLUME_SIZE"]
         self.volume_size = int(os.environ["VOLUME_SIZE"])
-        self.port_binding = 2222 #int(os.environ["PORT_BINDING"]) if "PORT_BINDING" in os.environ else None
+        self.port_binding = 2222  # int(os.environ["PORT_BINDING"]) if "PORT_BINDING" in os.environ else None
 
         # Custom environment for notebook
         self.default_docker_image_gpu = os.environ["GPU_DOCKER_IMAGE"]
@@ -427,10 +427,7 @@ class ECSSpawner(Spawner):
 
         if self.port_binding:
             print(f"binding port = {self.port_binding}")
-            container_def["portMappings"] = {
-                                                "containerPort": self.port_binding,
-                                                "hostPort": self.port_binding
-                                             },
+            container_def["portMappings"] = ({"containerPort": self.port_binding, "hostPort": self.port_binding},)
             self.log.info(f"Binding port = {self.port_binding}")
 
         if self.instances[region][self.user_options["instance"]].get("gpu") is not None:
@@ -441,26 +438,35 @@ class ECSSpawner(Spawner):
 
         self.log.info("Creating ECS task def")
         self.state.append("Creating ECS task def")
-
-        r = ecs_client.register_task_definition(
+        volumes = [
+            {
+                "name": "shared-persistent-volume",
+                "efsVolumeConfiguration": {"fileSystemId": self.efs_id, "transitEncryption": "DISABLED"},
+            },
+            {
+                "name": "private-persistent-volume",
+                "efsVolumeConfiguration": {
+                    "fileSystemId": self.efs_private_id[self.user.name],
+                    "transitEncryption": "DISABLED",
+                },
+            },
+        ]
+        task_def = dict(
             family="jupyter-task-{0}".format(self.user.name),
             taskRoleArn=self.task_role_arn,
             networkMode="host",
-            volumes=[
-                {
-                    "name": "shared-persistent-volume",
-                    "efsVolumeConfiguration": {"fileSystemId": self.efs_id, "transitEncryption": "DISABLED"},
-                },
-                {
-                    "name": "private-persistent-volume",
-                    "efsVolumeConfiguration": {
-                        "fileSystemId": self.efs_private_id[self.user.name],
-                        "transitEncryption": "DISABLED",
-                    },
-                },
-            ],
+            volumes=volumes,
             containerDefinitions=[container_def],
         )
+        self.log.info("Volumes - ")
+        self.log.info(volumes)
+
+        self.log.info("Task Def - ")
+        self.log.info(task_def)
+        self.state.append(f"The EFS ID that was found for {self.user.name} is {self.efs_private_id[self.user.name]}")
+        self.log.info(f"The EFS ID that was found for {self.user.name} is {self.efs_private_id[self.user.name]}")
+        r = ecs_client.register_task_definition(task_def)
+
         self.log.info("ECS task created")
         self.task_definition_arn = r["taskDefinition"]["taskDefinitionArn"]
         self.log.info("Starting ECS task")
